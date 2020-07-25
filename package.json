@@ -1,0 +1,10 @@
+{
+  "name": "eloquent_javascript_solution",
+  "version": "1.0.0",
+  "description": "Решения задач из книги \"Выразительный JavaScript\" 2е издание",
+  "main": "index.js",
+  "repository": "https://github.com/Lukashev/eloquent_javascript_solution.git",
+  "author": "Nikita Lukashev",
+  "license": "MIT",
+  "private": false
+}
