@@ -22,6 +22,8 @@ const directions = {
   w: new Vector(-1, 0),
   nw: new Vector(-1, -1),
 };
+const gameInfo = document.getElementById('game__info')
+console.log(gameInfo)
 const directionNames = "n ne e se s sw w nw".split(" ");
 
 function elementFromChar(legend, ch) {
@@ -40,6 +42,40 @@ function charFromElement(element) {
 
 function randomElement(array) {
   return array[Math.floor(Math.random() * array.length)];
+}
+
+// GameInfo
+function GameInfo(world) {
+  this.world = world
+  this.container = null
+}
+
+GameInfo.prototype.update = function () {
+  const { legend, grid } = this.world
+  let stats = {}
+  for (let critter in legend) {
+    stats[critter] = 0
+  }
+  grid.forEach(function (...rest) {
+    const critter = rest[0]
+    if (stats.hasOwnProperty(critter.originChar)) {
+      stats[critter.originChar] += 1
+    }
+  }, null)
+  if (!this.container) {
+    this.container = document.getElementById('game__info')
+  }
+  if (this.container) {
+    let inner = ''
+    for (let key in stats) {
+      inner += `<li>${key} : ${stats[key]}</li>`
+    }
+    this.container.innerHTML = `
+      <ul>
+        ${inner}
+      </ul>
+    `
+  }
 }
 
 
@@ -83,10 +119,12 @@ Grid.prototype.forEach = function (f, context) {
 };
 
 // World
-function World(map, legend) {
+function World(map, legend, output) {
+  console.log(output)
   var grid = new Grid(map[0].length, map.length);
   this.grid = grid;
   this.legend = legend;
+  this.gameInfo = new GameInfo(this, output)
 
   map.forEach(function (line, y) {
     for (var x = 0; x < line.length; x++)
@@ -104,6 +142,7 @@ World.prototype.toString = function () {
     }
     output += '\n'
   }
+  this.gameInfo.update()
   return output
 }
 
@@ -203,7 +242,7 @@ View.prototype.find = function (ch) {
 }
 
 function LifelikeWorld(map, legend) {
-  World.call(this, map, legend)
+  World.call(this, map, legend, document.getElementById('game__info'))
 }
 
 LifelikeWorld.prototype = Object.create(World.prototype)
@@ -396,6 +435,7 @@ Tiger.prototype.act = function (view) {
     this.direction = space;
   return { type: "move", direction: this.direction };
 }
+
 
 const world = new LifelikeWorld(
   ["####################################################",
