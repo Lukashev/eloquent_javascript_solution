@@ -22,8 +22,6 @@ const directions = {
   w: new Vector(-1, 0),
   nw: new Vector(-1, -1),
 };
-const gameInfo = document.getElementById('game__info')
-console.log(gameInfo)
 const directionNames = "n ne e se s sw w nw".split(" ");
 
 function elementFromChar(legend, ch) {
@@ -119,12 +117,11 @@ Grid.prototype.forEach = function (f, context) {
 };
 
 // World
-function World(map, legend, output) {
-  console.log(output)
+function World(map, legend) {
   var grid = new Grid(map[0].length, map.length);
   this.grid = grid;
   this.legend = legend;
-  this.gameInfo = new GameInfo(this, output)
+  this.gameInfo = new GameInfo(this)
 
   map.forEach(function (line, y) {
     for (var x = 0; x < line.length; x++)
@@ -242,7 +239,7 @@ View.prototype.find = function (ch) {
 }
 
 function LifelikeWorld(map, legend) {
-  World.call(this, map, legend, document.getElementById('game__info'))
+  World.call(this, map, legend)
 }
 
 LifelikeWorld.prototype = Object.create(World.prototype)
