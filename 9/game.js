@@ -202,8 +202,224 @@ View.prototype.find = function (ch) {
   return randomElement(found)
 }
 
+function LifelikeWorld(map, legend) {
+  World.call(this, map, legend)
+}
 
-const world = new World(plan, { '#': Wall, 'o': BouncingCritter })
+LifelikeWorld.prototype = Object.create(World.prototype)
+
+// Убираем __proto__
+let actionTypes = Object.create(null)
+
+/**
+ * Рост энергии
+ */
+actionTypes.grow = function (critter) {
+  critter.energy += 0.5
+  return true
+}
+
+/**
+ * 1. Получаем вектор назначения
+ * 2. Если ячейка пустая, либо у существа уже нет энергии возвращаем false
+ * 3. Иначе уменьшая энергию на 1 и делаем смену позиций векторов в сетке
+ */
+actionTypes.move = function (critter, vector, action) {
+  const dest = this.checkDestination(action, vector)
+  if (dest == null ||
+    critter.energy <= 1 ||
+    this.grid.get(dest) != null) {
+    return false
+  }
+  critter.energy -= 1
+  this.grid.set(vector, null)
+  this.grid.set(dest, critter)
+  return true
+}
+
+/**
+ *  1. Поглощаем объект с энергией и забираем энергию
+ *  2. Объект удаляем из сетки
+ */
+actionTypes.eat = function (critter, vector, action) {
+  const dest = this.checkDestination(action, vector)
+  const atDest = dest != null && this.grid.get(dest)
+  if (!atDest || atDest.energy == null) {
+    return false
+  }
+  critter.energy += atDest.energy
+  this.grid.set(dest, null)
+  return true
+}
+
+/**
+ * Существо размножается, если у него вдвое больше энергии
+ */
+actionTypes.reproduce = function (critter, vector, action) {
+  const baby = elementFromChar(this.legend, critter.originChar)
+  const dest = this.checkDestination(action, vector)
+  if (dest == null ||
+    critter.energy <= 2 * baby.energy ||
+    this.grid.get(dest) != null) {
+    return false
+  }
+  critter.energy -= 2 * baby.energy
+  this.grid.set(dest, baby)
+  return true
+}
+
+LifelikeWorld.prototype.letAct = function (critter, vector) {
+  const action = critter.act(new View(this, vector))
+  const handled = action &&
+    action.type in actionTypes &&
+    actionTypes[action.type].call(this, critter, vector, action)
+
+  if (!handled) {
+    critter.energy -= 0.2
+    if (critter.energy <= 0) {
+      this.grid.set(vector, null)
+    }
+  }
+}
+
+function Plant() {
+  this.energy = 3 + Math.random() * 4
+}
+
+Plant.prototype.act = function (context) {
+  if (this.energy > 15) {
+    const space = context.find(' ')
+    if (space) {
+      return { type: 'reproduce', direction: space }
+    }
+  }
+  if (this.energy < 20) {
+    return { type: 'grow' }
+  }
+}
+
+function PlantEater() {
+  this.energy = 20
+}
+
+PlantEater.prototype.act = function (context) {
+  const space = context.find(' ')
+  if (this.energy > 60 && space) {
+    return { type: 'reproduce', direction: space }
+  }
+  const plant = context.find('*')
+  if (plant) {
+    return { type: 'eat', direction: plant }
+  }
+  if (space) {
+    return { type: 'move', direction: space }
+  }
+}
+
+// 9.1
+function SmartPlantEater() {
+  this.energy = 30
+  this.direction = randomElement(directionNames)
+}
+
+/**
+ * 1. Увеличиваем количество потребляемой энергии на размножение
+ * 2. Находим все растения, которые находятся вблизи существа
+ * 3. Если кол-во больше 1, то выбираем рандомное направление
+ * 4. Не выбираем новое нвправление, пока текущее дает нам пустую клетку
+ */
+SmartPlantEater.prototype.act = function (context) {
+  const space = context.find(' ')
+  if (this.energy > 90 && space) {
+    return { type: 'reproduce', direction: space }
+  }
+  const plants = context.findAll('*')
+  if (plants.length > 1) {
+    return { type: 'eat', direction: randomElement(plants) }
+  }
+  if (space) {
+    const ch = context.look(this.direction)
+    this.direction = ch === ' ' ? this.direction : space
+    return { type: 'move', direction: this.direction }
+  }
+}
+
+// 9.2
 
 
+// const world = new World(plan, { '#': Wall, 'o': BouncingCritter })
+var valley = new LifelikeWorld(
+  ["############################",
+    "#####                 ######",
+    "##   ***                **##",
+    "#   *##**         **  O  *##",
+    "#    ***     O    ##**    *#",
+    "#       O         ##***    #",
+    "#                 ##**     #",
+    "#   O       #*             #",
+    "#*          #**       O    #",
+    "#***        ##**    O    **#",
+    "##****     ###***       *###",
+    "############################"],
+  {
+    "#": Wall,
+    "O": SmartPlantEater,
+    "*": Plant
+  }
+);
 
+function Tiger() {
+  this.energy = 100;
+  this.direction = "w";
+  // Сохраняем кол-во замеченной добычи за ход на протяжении 6ти ходов
+  this.preySeen = [];
+}
+
+Tiger.prototype.act = function (view) {
+  // Среднее кол-во замеченной добычи за ход
+  var seenPerTurn = this.preySeen.reduce(function (a, b) {
+    return a + b;
+  }, 0) / this.preySeen.length;
+  var prey = view.findAll("O");
+  this.preySeen.push(prey.length);
+  // Удаляем первый элемент из массива если его длина больше 6
+  if (this.preySeen.length > 6)
+    this.preySeen.shift();
+  // Съедаем добычу, если вероятность больше 1/4
+  if (prey.length && seenPerTurn > 0.25)
+    return { type: "eat", direction: randomElement(prey) };
+
+  var space = view.find(" ");
+  if (this.energy > 400 && space)
+    return { type: "reproduce", direction: space };
+  if (view.look(this.direction) != " " && space)
+    this.direction = space;
+  return { type: "move", direction: this.direction };
+}
+
+const world = new LifelikeWorld(
+  ["####################################################",
+    "#                 ####         ****              ###",
+    "#   *  @  ##                 ########       OO    ##",
+    "#   *    ##        O O                 ****       *#",
+    "#       ##*                        ##########     *#",
+    "#      ##***  *         ****                     **#",
+    "#* **  #  *  ***      #########                  **#",
+    "#* **  #      *               #   *              **#",
+    "#     ##              #   O   #  ***          ######",
+    "#*            @       #       #   *        O  #    #",
+    "#*                    #  ######                 ** #",
+    "###          ****          ***                  ** #",
+    "#       O                        @         O       #",
+    "#   *     ##  ##  ##  ##               ###      *  #",
+    "#   **         #              *       #####  O     #",
+    "##  **  O   O  #  #    ***  ***        ###      ** #",
+    "###               #   *****                    ****#",
+    "####################################################"],
+  {
+    "#": Wall,
+    "@": Tiger,
+    "O": SmartPlantEater, // from previous exercise
+    "*": Plant
+  }
+)
